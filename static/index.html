@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube NLP &amp; RAG Studio</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-badge">NLP</div>
+        <div>
+          <h1>YouTube NLP &amp; RAG Studio</h1>
+          <p class="subtitle">Linguistic Analysis, NER, Segment Sentiment &amp; Emotion Timeline, and Transcript RAG</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span id="healthBadge" class="status-pill status-loading">Checking API...</span>
+        <a href="/docs" target="_blank" class="btn btn-ghost">API Docs</a>
+      </div>
+    </header>
+
+    <section class="card input-panel">
+      <div class="input-header">
+        <div class="mode-switch" role="tablist" aria-label="Input source mode">
+          <button id="modeTextBtn" class="mode-btn active" type="button">Raw Text / Transcript</button>
+          <button id="modeYoutubeBtn" class="mode-btn" type="button">YouTube Video ID / URL</button>
+        </div>
+        <div class="sample-controls">
+          <select id="sampleSelect" class="select-input" aria-label="Choose a sample transcript">
+            <option value="">Load sample transcript...</option>
+          </select>
+          <label class="inline-label" for="segmentCount">
+            Segments:
+            <select id="segmentCount" class="select-input select-sm">
+              <option value="4">4</option>
+              <option value="6" selected>6</option>
+              <option value="8">8</option>
+              <option value="10">10</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div id="textInputGroup" class="input-body">
+        <textarea
+          id="transcriptText"
+          rows="5"
+          placeholder="Paste a video transcript, lecture, article, or choose a sample above..."
+        ></textarea>
+      </div>
+
+      <div id="youtubeInputGroup" class="input-body hidden">
+        <div class="yt-row">
+          <input
+            id="videoIdInput"
+            type="text"
+            class="text-input"
+            placeholder="Enter YouTube Video ID (e.g. dQw4w9WgXcQ) or full URL..."
+          />
+        </div>
+        <p class="hint">Fetches captions via <code>youtube-transcript-api</code> with timestamps for timeline segmentation.</p>
+      </div>
+
+      <div class="input-footer">
+        <div id="statusMessage" class="status-text">Ready for analysis.</div>
+        <button id="analyzeBtn" class="btn btn-primary" type="button">Run NLP Analysis</button>
+      </div>
+    </section>
+
+    <section id="kpiGrid" class="kpi-grid hidden">
+      <div class="kpi-card">
+        <span class="kpi-label">Words / Sentences</span>
+        <strong id="kpiWords" class="kpi-value">-</strong>
+        <span id="kpiReadTime" class="kpi-sub">-</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Lexical Diversity (TTR)</span>
+        <strong id="kpiTtr" class="kpi-value">-</strong>
+        <span id="kpiUnique" class="kpi-sub">-</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Readability (Flesch)</span>
+        <strong id="kpiFlesch" class="kpi-value">-</strong>
+        <span id="kpiGrade" class="kpi-sub">-</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Overall Sentiment</span>
+        <strong id="kpiSentiment" class="kpi-value">-</strong>
+        <span id="kpiPolarity" class="kpi-sub">-</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Dominant Emotion</span>
+        <strong id="kpiEmotion" class="kpi-value">-</strong>
+        <span id="kpiEngine" class="kpi-sub">-</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Named Entities</span>
+        <strong id="kpiEntities" class="kpi-value">-</strong>
+        <span id="kpiEntityTypes" class="kpi-sub">-</span>
+      </div>
+    </section>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="overviewTab" type="button">Overview &amp; Summary</button>
+      <button class="tab-btn" data-tab="linguisticsTab" type="button">Linguistics &amp; NER</button>
+      <button class="tab-btn" data-tab="sentimentTab" type="button">Sentiment &amp; Emotion Timeline</button>
+      <button class="tab-btn" data-tab="preprocessingTab" type="button">Preprocessing Pipeline</button>
+      <button class="tab-btn" data-tab="ragTab" type="button">RAG ChatBot (/ask)</button>
+    </nav>
+
+    <main class="tab-panels">
+      <!-- Overview Tab -->
+      <section id="overviewTab" class="tab-panel active">
+        <div class="grid-2">
+          <div class="card">
+            <h2>Extractive Summary (TF-IDF Salience)</h2>
+            <div id="summaryList" class="stack-list empty-state">Run NLP analysis to generate an extractive summary.</div>
+          </div>
+          <div class="card">
+            <h2>Top TF-IDF Keywords &amp; Noun Phrases</h2>
+            <div class="sub-section">
+              <h3>TF-IDF Keyphrases</h3>
+              <div id="keywordsChips" class="chip-wrap empty-state">No keywords yet.</div>
+            </div>
+            <div class="sub-section">
+              <h3>Top Noun Phrases</h3>
+              <div id="nounPhrasesChips" class="chip-wrap empty-state">No noun phrases yet.</div>
+            </div>
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="card">
+            <h3>Top Lemmatized Tokens</h3>
+            <div id="topTokensList" class="mini-bars empty-state">No tokens yet.</div>
+          </div>
+          <div class="card">
+            <h3>Top Bigrams</h3>
+            <div id="bigramsList" class="mini-bars empty-state">No bigrams yet.</div>
+          </div>
+          <div class="card">
+            <h3>Top Trigrams</h3>
+            <div id="trigramsList" class="mini-bars empty-state">No trigrams yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Linguistics & NER Tab -->
+      <section id="linguisticsTab" class="tab-panel">
+        <div class="card">
+          <div class="panel-header-row">
+            <h2>Named Entity Highlighting</h2>
+            <div id="entityFilterBar" class="chip-wrap"></div>
+          </div>
+          <div id="highlightedTranscript" class="highlighted-text empty-state">
+            Run analysis to inspect inline Named Entity Recognition (PERSON, ORG, GPE, DATE, etc.).
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <h2>Part-of-Speech (POS) Distribution</h2>
+            <div id="posChart" class="mini-bars empty-state">No POS data yet.</div>
+          </div>
+          <div class="card">
+            <h2>Entities Grouped by Type</h2>
+            <div id="entitiesGrouped" class="stack-list empty-state">No entities extracted yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sentiment & Emotion Timeline Tab -->
+      <section id="sentimentTab" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h2>Sentiment Polarity Trajectory Across Segments</h2>
+            <div id="sentimentChartContainer" class="chart-box empty-state">
+              Run analysis to visualize sentiment polarity (-1.0 to +1.0) over time.
+            </div>
+          </div>
+          <div class="card">
+            <h2>Overall Emotion Distribution</h2>
+            <div id="emotionBars" class="mini-bars empty-state">No emotion scores yet.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Segment-by-Segment Inspector</h2>
+          <div id="segmentsGrid" class="segments-grid empty-state">No segments analyzed yet.</div>
+        </div>
+      </section>
+
+      <!-- Preprocessing Tab -->
+      <section id="preprocessingTab" class="tab-panel">
+        <div class="card">
+          <h2>Cleaned &amp; Normalized Transcript</h2>
+          <div id="cleanedTextBox" class="cleaned-box empty-state">Cleaned text will appear here.</div>
+        </div>
+        <div class="card">
+          <div class="panel-header-row">
+            <h2>Token-Level Linguistic Table (Token &rarr; Lemma &rarr; Stem &rarr; POS)</h2>
+            <input id="tokenSearch" type="text" class="text-input input-sm" placeholder="Filter tokens or POS..." />
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Token</th>
+                  <th>Lemma</th>
+                  <th>Porter Stem</th>
+                  <th>POS</th>
+                  <th>Tag</th>
+                  <th>Stopword</th>
+                </tr>
+              </thead>
+              <tbody id="tokenTableBody">
+                <tr><td colspan="7" class="empty-cell">Run analysis to inspect tokens.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- RAG ChatBot Tab -->
+      <section id="ragTab" class="tab-panel">
+        <div class="card">
+          <h2>YouTube Transcript RAG ChatBot (<code>POST /ask</code>)</h2>
+          <p class="hint">
+            Uses ChromaDB MMR vector retrieval (<code>nomic-embed-text</code>) + <code>llama3.2</code> via local Ollama to answer questions strictly from a YouTube video's transcript.
+          </p>
+          <div class="rag-controls">
+            <input
+              id="ragVideoId"
+              type="text"
+              class="text-input"
+              placeholder="YouTube Video ID or URL (e.g. dQw4w9WgXcQ)"
+            />
+          </div>
+          <div id="chatMessages" class="chat-box">
+            <div class="chat-msg chat-system">Ask a question about a YouTube video transcript below.</div>
+          </div>
+          <form id="chatForm" class="chat-form">
+            <input
+              id="ragQuestion"
+              type="text"
+              class="text-input"
+              placeholder="Ask a question about the video..."
+              required
+            />
+            <button id="askBtn" type="submit" class="btn btn-primary">Ask</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

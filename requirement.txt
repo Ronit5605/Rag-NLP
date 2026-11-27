@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+youtube-transcript-api
+langchain-ollama
+langchain-chroma
+langchain-text-splitters
+pydantic
+spacy
+nltk
+scikit-learn
+textstat
+rouge-score
+httpx
